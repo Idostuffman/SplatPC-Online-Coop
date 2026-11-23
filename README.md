@@ -10,15 +10,12 @@ Standalone native C++ mod for **SplatPC** adding:
 ---
 
 ## Installation
-
-<<<<<<< Updated upstream
 1. Copy `online_coop.dll` (Windows) or `online_coop.so` (Linux) into a `mods/` folder right next to `Splatoon.exe` / `Splatoon` (or set `RBREW_MODS_DIR`).
 2. Launch SplatPC and press **ESC -> Mods -> Online Co-op**.
 =======
 1. Download `online_coop.dll` (Windows) or `online_coop.so` (Linux) from the repository's **Releases** (or the latest **Actions** workflow artifacts), or build from source below.
 2. Copy the binary into a `mods/` folder right next to `Splatoon.exe` / `Splatoon` (or set `RBREW_MODS_DIR`).
 3. Launch SplatPC and press **ESC → Mods → Online Co-op**.
->>>>>>> Stashed changes
 
 To join a friend's host directly from the command line:
 
