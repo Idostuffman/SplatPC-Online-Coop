@@ -70,7 +70,8 @@ const char* mock_mods_dir() {
     return "";
 }
 
-SplatModHookHandle mock_hook_guest(uint32_t guest_addr, SplatModGuestHook hook, SplatModGuestOrig* out_orig) {
+SplatModHookHandle mock_hook_guest(uint32_t guest_addr, SplatModGuestHook hook, SplatModGuestOrig* out_orig,
+                                   unsigned int /*priority*/) {
     if (!hook) return 0;
     const uint64_t h = g_mock.next_handle++;
     g_mock.hooked_guests.emplace_back(h, guest_addr);
@@ -88,7 +89,7 @@ bool mock_unhook_guest(SplatModHookHandle handle) {
     return false;
 }
 
-SplatModHookHandle mock_hook_native(void*, void*, void**) {
+SplatModHookHandle mock_hook_native(void*, void*, void**, unsigned int /*priority*/) {
     return 0;
 }
 bool mock_unhook_native(SplatModHookHandle) {
