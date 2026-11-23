@@ -29,12 +29,6 @@ Settings are stored next to the mod DLL in `mods/online_coop.ini`, while Guest m
 
 ---
 
-## CI & Releases
-
-Every push and pull request runs GitHub Actions ([`.github/workflows/build.yml`](.github/workflows/build.yml)) to build, test, and upload `online_coop.dll` and `online_coop.so` as workflow artifacts. Pushing a version tag such as `v1.0.0` automatically creates a GitHub Release with both binaries and zip/tar archives attached.
-
----
-
 ## Building from Source
 
 Requires CMake 3.18+, a C++20 compiler (MSVC, LLVM-MinGW, GCC, or Clang), and SDL2 (`SDL2::SDL2-static` or `SDL2::SDL2`):
