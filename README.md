@@ -11,8 +11,14 @@ Standalone native C++ mod for **SplatPC** adding:
 
 ## Installation
 
+<<<<<<< Updated upstream
 1. Copy `online_coop.dll` (Windows) or `online_coop.so` (Linux) into a `mods/` folder right next to `Splatoon.exe` / `Splatoon` (or set `RBREW_MODS_DIR`).
 2. Launch SplatPC and press **ESC -> Mods -> Online Co-op**.
+=======
+1. Download `online_coop.dll` (Windows) or `online_coop.so` (Linux) from the repository's **Releases** (or the latest **Actions** workflow artifacts), or build from source below.
+2. Copy the binary into a `mods/` folder right next to `Splatoon.exe` / `Splatoon` (or set `RBREW_MODS_DIR`).
+3. Launch SplatPC and press **ESC → Mods → Online Co-op**.
+>>>>>>> Stashed changes
 
 To join a friend's host directly from the command line:
 
@@ -23,6 +29,12 @@ Splatoon.exe --join <host-ip>[:port]
 *(Or set `RBREW_NET_HOST=1` / `RBREW_NET_HOST=<port>` or `RBREW_NET_JOIN=<ip>[:port]`.)*
 
 Settings are stored next to the mod DLL in `mods/online_coop.ini`, while Guest mode inherits keybindings, mouse sensitivity, and audio volume from SplatPC's `settings.ini`.
+
+---
+
+## CI & Releases
+
+Every push and pull request runs GitHub Actions ([`.github/workflows/build.yml`](.github/workflows/build.yml)) to build, test, and upload `online_coop.dll` and `online_coop.so` as workflow artifacts. Pushing a version tag such as `v1.0.0` automatically creates a GitHub Release with both binaries and zip/tar archives attached.
 
 ---
 

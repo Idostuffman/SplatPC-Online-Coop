@@ -1,0 +1,200 @@
+name: Build & Release
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    name: Build & Test (Windows x64)
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache static SDL2
+        uses: actions/cache@v4
+        with:
+          path: deps/sdl2
+          key: sdl2-2.32.10-windows-x64-static-v1
+
+      - name: Build static SDL2 (2.32.10)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "deps/sdl2/cmake/SDL2Config.cmake") -and -not (Test-Path "deps/sdl2/lib/cmake/SDL2/SDL2Config.cmake")) {
+            $tmp = Join-Path "${{ runner.temp }}" "sdl2-win"
+            New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+            $zip = Join-Path $tmp "SDL2-2.32.10.zip"
+            Invoke-WebRequest -Uri "https://github.com/libsdl-org/SDL/releases/download/release-2.32.10/SDL2-2.32.10.zip" -OutFile $zip
+            Expand-Archive -Path $zip -DestinationPath $tmp -Force
+            cmake -S (Join-Path $tmp "SDL2-2.32.10") -B (Join-Path $tmp "build") -A x64 `
+              -DSDL_SHARED=OFF -DSDL_STATIC=ON `
+              -DSDL_TEST=OFF -DSDL_TESTS=OFF `
+              -DSDL_DISABLE_INSTALL_DOCS=ON `
+              -DSDL_FORCE_STATIC_VCRT=OFF `
+              "-DCMAKE_INSTALL_PREFIX=$PWD/deps/sdl2"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            cmake --build (Join-Path $tmp "build") --config Release --target install --parallel
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Configure & build mod
+        shell: pwsh
+        run: |
+          cmake -S . -B build -A x64 `
+            "-DCMAKE_PREFIX_PATH=$PWD/deps/sdl2" `
+            -DONLINE_COOP_BUILD_TESTS=ON
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build build --config Release --parallel
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Run tests
+        shell: pwsh
+        run: |
+          ctest --test-dir build -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Package Windows artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/stage | Out-Null
+          Copy-Item build/Release/online_coop.dll dist/online_coop.dll
+          Copy-Item build/Release/online_coop.dll dist/stage/online_coop.dll
+          Copy-Item README.md dist/stage/README.md
+          Compress-Archive -Path dist/stage/* -DestinationPath dist/online_coop-windows-x64.zip -Force
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: online_coop-windows-x64
+          path: |
+            dist/online_coop.dll
+            dist/online_coop-windows-x64.zip
+          if-no-files-found: error
+
+  build-linux:
+    name: Build & Test (Linux x64)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake \
+            ninja-build \
+            build-essential \
+            pkg-config \
+            libx11-dev \
+            libxext-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxrandr-dev \
+            libxfixes-dev \
+            libxss-dev \
+            libxkbcommon-dev \
+            libwayland-dev \
+            wayland-protocols \
+            libasound2-dev \
+            libpulse-dev
+
+      - name: Cache static SDL2
+        uses: actions/cache@v4
+        with:
+          path: deps/sdl2
+          key: sdl2-2.32.10-linux-x64-static-pic-v1
+
+      - name: Build static PIC SDL2 (2.32.10)
+        run: |
+          if [ ! -f "deps/sdl2/lib/cmake/SDL2/SDL2Config.cmake" ] && [ ! -f "deps/sdl2/lib64/cmake/SDL2/SDL2Config.cmake" ]; then
+            TMP="${RUNNER_TEMP}/sdl2-linux"
+            mkdir -p "$TMP"
+            curl -fL --retry 3 https://github.com/libsdl-org/SDL/releases/download/release-2.32.10/SDL2-2.32.10.tar.gz -o "$TMP/SDL2-2.32.10.tar.gz"
+            tar -xzf "$TMP/SDL2-2.32.10.tar.gz" -C "$TMP"
+            cmake -S "$TMP/SDL2-2.32.10" -B "$TMP/build" -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+              -DSDL_SHARED=OFF -DSDL_STATIC=ON \
+              -DSDL_TEST=OFF -DSDL_TESTS=OFF \
+              -DSDL_DISABLE_INSTALL_DOCS=ON \
+              -DCMAKE_INSTALL_PREFIX="$PWD/deps/sdl2"
+            cmake --build "$TMP/build" --target install
+          fi
+
+      - name: Configure & build mod
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$PWD/deps/sdl2" \
+            -DONLINE_COOP_BUILD_TESTS=ON
+          cmake --build build
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Package Linux artifacts
+        run: |
+          mkdir -p dist/stage
+          cp build/online_coop.so dist/online_coop.so
+          cp build/online_coop.so dist/stage/online_coop.so
+          cp README.md dist/stage/README.md
+          tar -C dist/stage -czf dist/online_coop-linux-x64.tar.gz online_coop.so README.md
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: online_coop-linux-x64
+          path: |
+            dist/online_coop.so
+            dist/online_coop-linux-x64.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-24.04
+    needs: [build-windows, build-linux]
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" --repo "${{ github.repository }}" --clobber \
+              release-assets/online_coop.dll \
+              release-assets/online_coop.so \
+              release-assets/online_coop-windows-x64.zip \
+              release-assets/online_coop-linux-x64.tar.gz
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              --repo "${{ github.repository }}" \
+              --title "${GITHUB_REF_NAME}" \
+              --generate-notes \
+              release-assets/online_coop.dll \
+              release-assets/online_coop.so \
+              release-assets/online_coop-windows-x64.zip \
+              release-assets/online_coop-linux-x64.tar.gz
+          fi
